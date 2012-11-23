@@ -22,28 +22,27 @@
 #ifndef PLATANOS_COLUMN_H_
 #define PLATANOS_COLUMN_H_
 
+#include<stdint.h>
+
+typedef struct column_t_ column_t;
+
+void column_init (column_t ** column);
+void column_destroy (column_t ** column);
 
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
+//read a number which we know is 1 byte
+//no checks are done
 
-    typedef struct column_t_ column_t;
-    typedef struct column_reader_t_ column_reader_t;
-    typedef struct column_writer_t_ column_writer_t;
+inline uint64_t column_sread (column_t * column, uint64_t position);
 
-    void column_init (column_t ** column);
-    void column_destroy (column_t ** column);
+//this is a read for big numbers
+uint64_t column_bread (column_t * column, uint64_t position);
 
-    void column_reader_init (column_reader_t column_reader,
-			     column_t * column);
-    void column_writer_init (column_writer_t column_writer, column_t column);
+//this is a general read
+inline uint64_t column_read (column_t * column, uint64_t position);
 
-
-#ifdef __cplusplus
-}
-#endif
+inline int column_write (struct column_t_ *column, uint64_t position,
+			 uint64_t value);
 
 #endif
