@@ -54,6 +54,13 @@ person_destroy (person_t * person)
 
 }
 
+column_t *
+person_csearch (person_t * person, column_t * column)
+{
+    return RB_FIND (columns_rb_t, &(person->columns_rb), column);
+}
+
+
 void
 db_scache_init (db_scache_t ** db_scache)
 {
@@ -72,4 +79,10 @@ db_scache_destroy (db_scache_t * db_scache)
 
     free (db_scache);
 
+}
+
+person_t *
+db_scache_psearch (db_scache_t * db_scache, person_t * person)
+{
+    return RB_FIND (persons_rb_t, &(db_scache->persons_rb), person);
 }

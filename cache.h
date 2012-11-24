@@ -50,4 +50,6 @@ void db_scache_init (db_scache_t ** db_scache);
 
 void db_scache_destroy (db_scache_t * db_scache);
 
+person_t *db_scache_psearch (db_scache_t * db_scache, person_t * person);
+
 #endif
