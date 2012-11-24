@@ -23,11 +23,26 @@
 #define PLATANOS_COLUMN_H_
 
 #include<stdint.h>
+#include"tree/tree.h"
+
+
+struct column_t_
+{
+    uint64_t uid;
+    uint8_t percentage;
+    uint8_t *buffer;
+    uint64_t size;
+      RB_ENTRY (column_t_) field;
+
+};
+
+
+
 
 typedef struct column_t_ column_t;
 
-void column_init (column_t ** column);
-void column_destroy (column_t ** column);
+void column_init (column_t ** column, uint64_t uid, uint8_t percentage);
+void column_destroy (column_t * column);
 
 
 
@@ -37,12 +52,22 @@ void column_destroy (column_t ** column);
 inline uint64_t column_sread (column_t * column, uint64_t position);
 
 //this is a read for big numbers
-uint64_t column_bread (column_t * column, uint64_t position);
+uint64_t column_bread (column_t * column, uint64_t position, uint8_t * size);
 
 //this is a general read
-inline uint64_t column_read (column_t * column, uint64_t position);
+inline uint64_t column_read (column_t * column, uint64_t position,
+			     uint8_t * size);
 
+//returns the size of the value in varint
 inline int column_write (struct column_t_ *column, uint64_t position,
 			 uint64_t value);
+
+//up must be pointing to a key
+//returns the position plus the size of that key so as to fetch the value of the key
+//you must always check the size
+//keys are always bigger than 1 byte
+uint64_t
+column_bsearch (struct column_t_ *column, uint64_t up_position, uint64_t key,
+		uint8_t * size);
 
 #endif

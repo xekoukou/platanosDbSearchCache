@@ -21,21 +21,19 @@
 #include<stdlib.h>
 #include<stdint.h>
 #include<assert.h>
+#include"column.h"
 
-
-struct column_t_
-{
-    uint8_t percentage;
-    uint8_t *buffer;
-};
 
 void
-column_init (struct column_t_ **column, uint8_t percentage)
+column_init (struct column_t_ **column, uint64_t uid, uint8_t percentage)
 {
 
     *column = (struct column_t_ *) malloc (sizeof (struct column_t_));
     (*column)->percentage = percentage;
     (*column)->buffer = (uint8_t *) malloc (MAX_BUFFER_SIZE);
+    (*column)->size = 0;
+    (*column)->uid = uid;
+
 }
 
 void
@@ -56,7 +54,7 @@ column_sread (struct column_t_ *column, uint64_t position)
 
 //this is a read for big numbers
 uint64_t
-column_bread (struct column_t_ * column, uint64_t position)
+column_bread (struct column_t_ * column, uint64_t position, uint8_t * size)
 {
 
     const uint8_t *ptr = column->buffer + position;
@@ -69,43 +67,53 @@ column_bread (struct column_t_ * column, uint64_t position)
     b = *(ptr++);
     part0 = (b & 0x7F);
     if (!(b & 0x80))
-	goto done;
+	*size = 1;
+    goto done;
     b = *(ptr++);
     part0 |= (b & 0x7F) << 7;
     if (!(b & 0x80))
-	goto done;
+	*size = 2;
+    goto done;
     b = *(ptr++);
     part0 |= (b & 0x7F) << 14;
     if (!(b & 0x80))
-	goto done;
+	*size = 3;
+    goto done;
     b = *(ptr++);
     part0 |= (b & 0x7F) << 21;
     if (!(b & 0x80))
-	goto done;
+	*size = 4;
+    goto done;
     b = *(ptr++);
     part1 = (b & 0x7F);
     if (!(b & 0x80))
-	goto done;
+	*size = 5;
+    goto done;
     b = *(ptr++);
     part1 |= (b & 0x7F) << 7;
     if (!(b & 0x80))
-	goto done;
+	*size = 6;
+    goto done;
     b = *(ptr++);
     part1 |= (b & 0x7F) << 14;
     if (!(b & 0x80))
-	goto done;
+	*size = 7;
+    goto done;
     b = *(ptr++);
     part1 |= (b & 0x7F) << 21;
     if (!(b & 0x80))
-	goto done;
+	*size = 8;
+    goto done;
     b = *(ptr++);
     part2 = (b & 0x7F);
     if (!(b & 0x80))
-	goto done;
+	*size = 9;
+    goto done;
     b = *(ptr++);
     part2 |= (b & 0x7F) << 7;
     if (!(b & 0x80))
-	goto done;
+	*size = 10;
+    goto done;
 
   done:
 
@@ -116,15 +124,14 @@ column_bread (struct column_t_ * column, uint64_t position)
 }
 
 inline uint64_t
-column_read (struct column_t_ * column, uint64_t position, int *big)
+column_read (struct column_t_ * column, uint64_t position, uint8_t * size)
 {
     if (column->buffer[position] < 0x80) {
-	*big = 0;
+	*size = 1;
 	return column->buffer[position];
     }
     else {
-	*big = 1;
-	return column_bread (column, position);
+	return column_bread (column, position, size);
     }
 }
 
@@ -223,4 +230,37 @@ column_write (struct column_t_ *column, uint64_t position, uint64_t value)
 
     return size;
 
+}
+
+//up must be pointing to a key
+//returns the position plus the size of that key so as to fetch the value of the key
+//you must always check the size
+//keys are always bigger than 1 byte
+uint64_t
+column_bsearch (struct column_t_ * column, uint64_t up_position, uint64_t key,
+		uint8_t * size)
+{
+
+    uint64_t up = up_position;
+    uint64_t down = column->size - 1;
+
+    while (up <= down) {
+	uint64_t mid = (up + *size + down) / 2;
+	uint64_t mid_val = column_read (column, mid, size);
+	if (*size == 1) {
+	    mid++;
+	    mid_val = column_bread (column, mid, size);
+	}
+	if (mid_val < key) {
+	    up = mid + *size;
+	}
+	else if (mid_val > key) {
+	    down = mid - 1;
+	}
+	else {
+	    return mid;
+	}
+    }
+    *size = 0;
+    return 0;
 }
