@@ -66,8 +66,14 @@ inline int column_write (struct column_t_ *column, uint64_t position,
 //returns the position plus the size of that key so as to fetch the value of the key
 //you must always check the size
 //keys are always bigger than 1 byte
+//if we reach the end of the column,we return the size of the column
 uint64_t
 column_bsearch (struct column_t_ *column, uint64_t up_position, uint64_t key,
 		uint8_t * size);
+
+//both percentage and column need to be of dimension dim
+uint8_t *columns_join (struct column_t_ *column[], uint8_t percentage[],
+		       int dim, uint64_t * size);
+
 
 #endif
