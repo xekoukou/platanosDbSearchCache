@@ -33,7 +33,7 @@ typedef struct person_t_ person_t;
 
 void person_init (person_t ** person, uint64_t uid);
 
-void person_destroy (person_t * person);
+void person_destroy (person_t ** person);
 
 struct db_scache_t_
 {
@@ -48,7 +48,7 @@ typedef struct db_scache_t_ db_scache_t;
 
 void db_scache_init (db_scache_t ** db_scache);
 
-void db_scache_destroy (db_scache_t * db_scache);
+void db_scache_destroy (db_scache_t ** db_scache);
 
 person_t *db_scache_psearch (db_scache_t * db_scache, person_t * person);
 

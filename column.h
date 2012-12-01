@@ -42,7 +42,7 @@ struct column_t_
 typedef struct column_t_ column_t;
 
 void column_init (column_t ** column, uint64_t uid, uint8_t percentage);
-void column_destroy (column_t * column);
+void column_destroy (column_t ** column);
 
 
 
@@ -62,14 +62,13 @@ inline uint64_t column_read (column_t * column, uint64_t position,
 inline int column_write (struct column_t_ *column, uint64_t position,
 			 uint64_t value);
 
-//up must be pointing to a key
-//returns the position plus the size of that key so as to fetch the value of the key
-//you must always check the size
-//keys are always bigger than 1 byte
-//if we reach the end of the column,we return the size of the column
+//used by the join function
+//returns the position
+//key is the key at that position
+//size is the size of the key in varint
 uint64_t
-column_bsearch (struct column_t_ *column, uint64_t up_position, uint64_t key,
-		uint8_t * size);
+column_middle(struct column_t_ *column,uint64_t start, uint64_t end,uint64_t *key,uint8_t *size);
+
 
 //both percentage and column need to be of dimension dim
 uint8_t *columns_join (struct column_t_ *column[], uint8_t percentage[],

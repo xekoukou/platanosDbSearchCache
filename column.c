@@ -38,10 +38,11 @@ column_init (struct column_t_ **column, uint64_t uid, uint8_t percentage)
 }
 
 void
-column_destroy (struct column_t_ *column)
+column_destroy (struct column_t_ **column)
 {
-    free (column->buffer);
-    free (column);
+    free ((*column)->buffer);
+    free (*column);
+    *column=NULL;
 };
 
 //read a number which we know is 1 byte
@@ -243,143 +244,26 @@ column_write (struct column_t_ *column, uint64_t position, uint64_t value)
 
 }
 
-//up must be pointing to a key
-//returns the position plus the size of that key so as to fetch the value of the key
-//you must always check the size
-//keys are always bigger than 1 byte
 uint64_t
-column_bsearch (struct column_t_ * column, uint64_t up_position, uint64_t key,
-		uint8_t * size)
-{
+column_middle(struct column_t_ *column,uint64_t start, uint64_t end,uint64_t *key,uint8_t *size){
+assert((start+24<=end)|(start>=24+end));
 
-    uint64_t up = up_position;
-    uint64_t down = column->size - 1;
-    uint64_t mid_val;
-    uint64_t mid;
-
-    while (up + 24 <= down) {	//???correct we set 24 because we make multiple reads to go to a valid number
-	mid = (up + *size + down) / 2;
+uint64_t mid = (start + end) / 2;
 	column_read (column, mid, size);
 	mid += *size;
-	mid_val = column_read (column, mid, size);
+	*key = column_read (column, mid, size);
 	if (*size == 1) {
 	    mid++;
-	    mid_val = column_bread (column, mid, size);
+	    *key = column_bread (column, mid, size);
 	}
-	if (mid_val < key) {
-	    up = mid + *size + 1;	//plus 1 for the value of the key
-	}
-	else if (mid_val > key) {
-	    down = mid - 2;	//minus 1 more cos of the value
-	}
-	else {
-	    return mid;
-	}
-    }
-    mid = up;
-    while (mid <= down) {
-//up must always be at a key
-	mid_val = column_bread (column, mid, size);
-	if (mid_val < key) {
-	    mid = mid + *size + 1;
-	}
-	else {
-	    if (mid_val == key) {
-		return mid;
-	    }
-	    else {
-		*size = 0;
-		return mid;	//mid here points to a key bigger than key
-	    }
-	}
-    }
-    *size = 0;
-    return column->size;	//here we send the last position
+        return mid;
 }
-
 
 //both percentage and column need to be of dimension dim
 uint8_t *
 columns_join (struct column_t_ * column[], uint8_t percentage[], int dim,
 	      uint64_t * size)
 {
-
-    uint64_t position[dim];
-//set positions to 0
-    int i;
-    uint64_t min_size = column[0]->size;
-    *size = 0;
-    uint8_t value_size;
-    uint64_t fixed_value = column_bread (column[0], 0, &value_size);
-    int fixed_dim = 0;
-    for (i = 0; i < dim; i++) {
-	if (column[i]->size == 0) {
-	    return NULL;
-	}
-	uint64_t value;
-	uint8_t vsize;
-	if (fixed_value > (value = column_bread (column[i], 0, &vsize))) {
-	    fixed_value = value;
-	    fixed_dim = i;
-	    value_size = vsize;
-	}
-
-	position[i] = 0;
-	if (column[i]->size < min_size) {
-	    min_size = column[i]->size;
-	}
-    }
-
-
-
-
-//in order to use the column_write
-    column_t result;
-    result.buffer = malloc (min_size);
-    uint64_t write_position = 0;
-
-
-
-    while (1) {
-
-	int common = 1;
-	for (i = 0; i < dim; i++) {
-	    position[i] =
-		column_bsearch (column[i], position[i], fixed_value,
-				&value_size);
-	    if (value_size == 0) {
-		if (position[i] == column[i]->size) {
-		    return result.buffer;
-		}
-		else {
-
-		    common = 0;
-		    fixed_value =
-			column_bread (column[i], position[i], &value_size);
-		    break;
-		}
-
-	    }
-
-
-
-	}
-
-	if (common) {
-	    memcpy (result.buffer + write_position,
-		    column[0]->buffer + position[0], value_size);
-	    //in a joined column, we put a zero byte after the key to distinguish the values;
-	    result.buffer[write_position + value_size] = 0;
-	    for (i = 0; i < dim; i++) {
-		memcpy (result.buffer + write_position + value_size + i + 1,
-			column[i]->buffer + position[i] + value_size, 1);
-		position[i] = position[i] + value_size + 1;
-	    }
-	    fixed_value = column_bread (column[0], position[0], &value_size);
-	    write_position = write_position + value_size + 1 + dim;
-	    (*size)++;
-	}
-    }
 
 
 }

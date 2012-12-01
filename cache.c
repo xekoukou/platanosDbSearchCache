@@ -42,15 +42,16 @@ person_init (person_t ** person, uint64_t uid)
 }
 
 void
-person_destroy (person_t * person)
+person_destroy (person_t ** person)
 {
     column_t *iter = NULL;
 
-    RB_FOREACH (iter, columns_rb_t, &(person->columns_rb)) {
-	column_destroy (iter);
+    RB_FOREACH (iter, columns_rb_t, &((*person)->columns_rb)) {
+	column_destroy (&iter);
     }
 
-    free (person);
+    free (*person);
+    *person=NULL;
 
 }
 
@@ -69,15 +70,16 @@ db_scache_init (db_scache_t ** db_scache)
 }
 
 void
-db_scache_destroy (db_scache_t * db_scache)
+db_scache_destroy (db_scache_t ** db_scache)
 {
     person_t *iter = NULL;
 
-    RB_FOREACH (iter, persons_rb_t, &(db_scache->persons_rb)) {
-	person_destroy (iter);
+    RB_FOREACH (iter, persons_rb_t, &((*db_scache)->persons_rb)) {
+	person_destroy (&iter);
     }
 
-    free (db_scache);
+    free (*db_scache);
+    *db_scache=NULL;
 
 }
 
