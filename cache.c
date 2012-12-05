@@ -8,10 +8,10 @@ int
 cmp_column_t (struct column_t_ *first, struct column_t_ *second)
 {
     if (first->uid > second->uid) {
-	return 1;
+        return 1;
     }
     else if (first->uid < second->uid) {
-	return -1;
+        return -1;
     }
     return 0;
 }
@@ -22,10 +22,10 @@ int
 cmp_person_t (struct person_t_ *first, struct person_t_ *second)
 {
     if (first->uid > second->uid) {
-	return 1;
+        return 1;
     }
     else if (first->uid < second->uid) {
-	return -1;
+        return -1;
     }
     return 0;
 }
@@ -47,11 +47,11 @@ person_destroy (person_t ** person)
     column_t *iter = NULL;
 
     RB_FOREACH (iter, columns_rb_t, &((*person)->columns_rb)) {
-	column_destroy (&iter);
+        column_destroy (&iter);
     }
 
     free (*person);
-    *person=NULL;
+    *person = NULL;
 
 }
 
@@ -75,11 +75,11 @@ db_scache_destroy (db_scache_t ** db_scache)
     person_t *iter = NULL;
 
     RB_FOREACH (iter, persons_rb_t, &((*db_scache)->persons_rb)) {
-	person_destroy (&iter);
+        person_destroy (&iter);
     }
 
     free (*db_scache);
-    *db_scache=NULL;
+    *db_scache = NULL;
 
 }
 

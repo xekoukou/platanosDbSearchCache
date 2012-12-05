@@ -23,7 +23,13 @@
 #define PLATANOS_COLUMN_H_
 
 #include<stdint.h>
+#include<stdlib.h>
+#include<assert.h>
+#include<string.h>
+#include<math.h>
+#include"setlib/jlist.h"
 #include"tree/tree.h"
+
 
 
 struct column_t_
@@ -36,9 +42,6 @@ struct column_t_
 
 };
 
-
-
-
 typedef struct column_t_ column_t;
 
 void column_init (column_t ** column, uint64_t uid, uint8_t percentage);
@@ -49,30 +52,56 @@ void column_destroy (column_t ** column);
 //read a number which we know is 1 byte
 //no checks are done
 
-inline uint64_t column_sread (column_t * column, uint64_t position);
+inline uint64_t column_sread (column_t * column, int position);
 
 //this is a read for big numbers
 uint64_t column_bread (column_t * column, uint64_t position, uint8_t * size);
 
 //this is a general read
-inline uint64_t column_read (column_t * column, uint64_t position,
-			     uint8_t * size);
+uint64_t column_read (column_t * column, uint64_t position, uint8_t * size);
 
 //returns the size of the value in varint
-inline int column_write (struct column_t_ *column, uint64_t position,
-			 uint64_t value);
+int column_write (struct column_t_ *column, uint64_t position,
+                  uint64_t value);
+
+
+typedef struct
+{
+    uint64_t position;
+
+} llimit_t;
+
+//TODO position why here??
+struct join_t_
+{
+    jlist_t *jlist;
+    jnode_t **barray;
+    llimit_t *llimit;           //left bracket limit used for the bsearch
+    int size;                   //the barray_size
+    int dim;
+    int *position;
+};
+
+
+typedef struct join_t_ join_t;
+
+void join_new (join_t ** join, int max_dim, int max_size);
+
+void join_destroy (join_t ** join);
+
 
 //used by the join function
 //returns the position
 //key is the key at that position
 //size is the size of the key in varint
 uint64_t
-column_middle(struct column_t_ *column,uint64_t start, uint64_t end,uint64_t *key,uint8_t *size);
+column_middle (struct column_t_ *column, uint64_t start, uint64_t end,
+               uint64_t * key, uint8_t * size);
 
 
 //both percentage and column need to be of dimension dim
-uint8_t *columns_join (struct column_t_ *column[], uint8_t percentage[],
-		       int dim, uint64_t * size);
+uint8_t *join_columns (join_t * join, struct column_t_ *column[],
+                       uint8_t percentage[], int dim, uint64_t * size);
 
 
 #endif
