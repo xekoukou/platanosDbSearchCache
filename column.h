@@ -29,6 +29,7 @@
 #include<math.h>
 #include"setlib/jlist.h"
 #include"tree/tree.h"
+#include"varint.h"
 
 
 
@@ -49,20 +50,32 @@ void column_destroy (column_t ** column);
 
 
 
-//read a number which we know is 1 byte
-//no checks are done
 
-inline uint64_t column_sread (column_t * column, int position);
+//used by the join function
+//returns the position
+//key is the key at that position
+//size is the size of the key in varint
+uint64_t
+column_middle (struct column_t_ *column, uint64_t start, uint64_t end,
+               uint64_t * key, uint8_t * size);
 
-//this is a read for big numbers
-uint64_t column_bread (column_t * column, uint64_t position, uint8_t * size);
 
-//this is a general read
-uint64_t column_read (column_t * column, uint64_t position, uint8_t * size);
 
-//returns the size of the value in varint
-int column_write (struct column_t_ *column, uint64_t position,
-                  uint64_t value);
+typedef struct
+{
+    uint64_t *uid;
+    uint8_t *percentage;
+    uint8_t *buffer;
+    uint64_t size;
+    uint8_t dim;
+} intersection_t;
+
+
+intersection_t *intersection_new (uint64_t * uid, uint8_t * percentage,
+                                  uint8_t * buffer, uint64_t size,
+                                  uint8_t dim);
+
+void intersection_destroy (intersection_t ** intersection);
 
 
 typedef struct
@@ -90,18 +103,10 @@ void join_new (join_t ** join, int max_dim, int max_size);
 void join_destroy (join_t ** join);
 
 
-//used by the join function
-//returns the position
-//key is the key at that position
-//size is the size of the key in varint
-uint64_t
-column_middle (struct column_t_ *column, uint64_t start, uint64_t end,
-               uint64_t * key, uint8_t * size);
-
 
 //both percentage and column need to be of dimension dim
-uint8_t *join_columns (join_t * join, struct column_t_ *column[],
-                       uint8_t percentage[], int dim, uint64_t * size);
+intersection_t *join_columns (join_t * join, struct column_t_ *column[],
+                              uint8_t percentage[], int dim);
 
 
 #endif

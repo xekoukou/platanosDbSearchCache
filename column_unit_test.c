@@ -24,17 +24,17 @@ main ()
             uint64_t size;
             if ((common_value < 256 + 256 * (i + 1))
                 && (common_value > 256 * (i + 1))) {
-                size = column_write (column[j], position, common_value);
+                size = varint_write (column[j]->buffer, position, common_value);
             }
             else {
                 uint64_t value = rand () % 256 + 256 * (i + 1);
-                size = column_write (column[j], position, value);
+                size = varint_write (column[j]->buffer, position, value);
 
 
             }
             position += size;
 
-            column_write (column[j], position, rand () % 100);
+            varint_write (column[j]->buffer, position, rand () % 100);
 
             position++;
         }
@@ -48,9 +48,9 @@ main ()
         uint64_t position = 0;
         while (position < column[j]->size) {
             uint8_t size;
-            uint64_t key = column_read (column[j], position, &size);
+            uint64_t key = varint_read (column[j]->buffer, position, &size);
             position += size;
-            uint64_t value = column_read (column[j], position, &size);
+            uint64_t value = varint_read (column[j]->buffer, position, &size);
             assert (size == 1);
             position++;
             printf ("\nkey:%lu value:%lu", key, value);
@@ -60,26 +60,29 @@ main ()
 
 
 
-    column_t jcolumn;
+    intersection_t *intersection;
     uint8_t percentage[] = { 90, 90, 90, 90, 90 };
-    jcolumn.buffer = columns_join (column, percentage, 5, &(jcolumn.size));
-    assert (jcolumn.buffer != NULL);
+
+    join_t *join;
+    join_new(&join,5,5000000);
+    intersection = join_columns (join,column, percentage, 5);
+    assert (intersection->buffer != NULL);
 
 
-    printf ("\nsize:%lu", jcolumn.size);
+    printf ("\nsize:%lu", intersection->size);
 
     uint64_t position = 0;
-    while (position < jcolumn.size) {
+    while (position < intersection->size) {
         uint8_t size;
-        uint64_t key = column_read (&jcolumn, position, &size);
+        uint64_t key = varint_read (intersection->buffer, position, &size);
         position += size;
-        uint64_t value1 = column_read (&jcolumn, position + 1, &size);
-        uint64_t value2 = column_read (&jcolumn, position + 2, &size);
-        uint64_t value3 = column_read (&jcolumn, position + 3, &size);
-        uint64_t value4 = column_read (&jcolumn, position + 4, &size);
-        uint64_t value5 = column_read (&jcolumn, position + 5, &size);
+        uint64_t value1 = varint_read (intersection->buffer, position + 1, &size);
+        uint64_t value2 = varint_read (intersection->buffer, position + 2, &size);
+        uint64_t value3 = varint_read (intersection->buffer, position + 3, &size);
+        uint64_t value4 = varint_read (intersection->buffer, position + 4, &size);
+        uint64_t value5 = varint_read (intersection->buffer, position + 5, &size);
         assert (size == 1);
-        position++;
+        position+=5;
         printf
             ("\nkey:%lu value1:%lu value2:%lu value3:%lu value4:%lu value5:%lu ",
              key, value1, value2, value3, value4, value5);
