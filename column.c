@@ -16,52 +16,40 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#define MAX_BUFFER_SIZE 5242880
+//check jlist.h if you change these
+//also intersection_join
+#define MAX_BUF_SIZE 5242880
+#define MAX_DIM_INTER 20
+#define min_bracket (20*2 +2*MAX_DIM_INTER +1)
 
 #include"column.h"
 
 
-void
-column_init (struct column_t_ **column, uint64_t uid, uint8_t percentage)
-{
-
-    *column = malloc (sizeof (struct column_t_));
-    (*column)->percentage = percentage;
-    (*column)->buffer = (uint8_t *) malloc (MAX_BUFFER_SIZE);
-    (*column)->size = 0;
-    (*column)->uid = uid;
-
-}
-
-void
-column_destroy (struct column_t_ **column)
-{
-    free ((*column)->buffer);
-    free (*column);
-    *column = NULL;
-};
-
 
 uint64_t
-column_middle (struct column_t_ *column, uint64_t start, uint64_t end,
-               uint64_t * key, uint8_t * size)
+intersection_middle (intersection_t * intersection, uint64_t start,
+                     uint64_t end, uint64_t * key, uint8_t * size)
 {
-    assert ((start + 24 <= end) | (start >= 24 + end));
+    assert ((start + 20 + 2 * intersection->dim + 1 <= end) | (start >=
+                                                               20 +
+                                                               2 *
+                                                               intersection->dim
+                                                               + 1 + end));
     uint64_t mid = (start + end) / 2;
-    varint_read (column->buffer, mid, size);
+    varint_read (intersection->buffer, mid, size);
     mid += *size;
-    *key = varint_read (column->buffer, mid, size);
-    if (*size == 1) {
+    *key = varint_read (intersection->buffer, mid, size);
+    while (*size == 1) {
         mid++;
-        *key = varint_bread (column->buffer, mid, size);
+        *key = varint_read (intersection->buffer, mid, size);
     }
     return mid;
 }
 
 
 intersection_t *
-intersection_new (uint64_t * uid, uint8_t * percentage, uint8_t * buffer,
-                  uint64_t size, uint8_t dim)
+intersection_enew (uint64_t * uid, uint8_t * percentage, uint8_t * buffer,
+                   uint64_t size, uint8_t dim)
 {
     intersection_t *intersection = malloc (sizeof (intersection_t));
     intersection->dim = dim;
@@ -76,6 +64,24 @@ intersection_new (uint64_t * uid, uint8_t * percentage, uint8_t * buffer,
     return intersection;
 }
 
+intersection_t *
+intersection_inew (uint64_t * uid, uint8_t * percentage, uint8_t dim)
+{
+    intersection_t *intersection = malloc (sizeof (intersection_t));
+    intersection->dim = dim;
+    intersection->uid = malloc (sizeof (uint64_t) * dim);
+    intersection->percentage = malloc (sizeof (uint8_t) * dim);
+    intersection->buffer = (uint8_t *) malloc (MAX_BUF_SIZE);
+    intersection->size = MAX_BUF_SIZE;
+
+
+    memcpy (intersection->uid, uid, sizeof (uint64_t) * dim);
+    memcpy (intersection->percentage, percentage, sizeof (uint8_t) * dim);
+
+    return intersection;
+}
+
+
 void
 intersection_destroy (intersection_t ** intersection)
 {
@@ -86,298 +92,332 @@ intersection_destroy (intersection_t ** intersection)
 
 }
 
-
-
-void
-join_new (join_t ** join, int max_dim, int max_size)
+typedef struct
 {
-    *join = calloc (1, sizeof (join_t));
-    (*join)->dim = max_dim;
-    int array_size = (int) log2 (max_size) + 1 + 8;     //when start and end are close
-//we stop using bsearch, that is why i added 8, the maximum number of elements 24/3
-//3 is is the minimum size of a key plus value
-    (*join)->size = array_size;
-    int max_height = (int) log2 (max_dim * array_size) + 1;
-    (*join)->jlist = jlist_new (max_height);
-    (*join)->barray = calloc (max_dim, sizeof (jnode_t *));
-    (*join)->llimit = calloc (max_dim, sizeof (llimit_t));
-    (*join)->position = calloc (max_dim, sizeof (int));
-    int iter;
-    for (iter = 0; iter < max_dim; iter++) {
-        (*join)->barray[iter] = calloc (array_size, sizeof (jnode_t));
-        int siter;
-        for (siter = 0; siter < array_size; siter++) {
-            (*join)->barray[iter][siter].next =
-                calloc (max_height, sizeof (jnode_t *));
-            (*join)->barray[iter][siter].dim = iter;
-        }
-    }
-
-
-}
-
-void
-join_destroy (join_t ** join)
-{
-
-    int iter;
-    for (iter = 0; iter < (*join)->dim; iter++) {
-        int siter;
-        for (siter = 0; siter < (*join)->size; siter++) {
-            free ((*join)->barray[iter][siter].next);
-
-        }
-        free ((*join)->barray[iter]);
-    }
-    free ((*join)->position);
-    free ((*join)->llimit);
-    free ((*join)->barray);
-    jlist_destroy (&((*join)->jlist));
-    free (*join);
-    *join = NULL;
-}
-
-
-//both percentage and column need to be of dimension dim
-//TODO take the percentages into consideration
-intersection_t *
-join_columns (join_t * join, struct column_t_ *column[],
-              uint8_t percentage[], int dim)
-{
-    assert (dim <= join->dim);
-
-    jlist_clear (join->jlist);
-    uint64_t key;
     uint64_t position;
-    uint8_t value;
+    uint8_t value[MAX_DIM_INTER];
     uint8_t size;
+} stack_t;
 
-    int min_size = column[0]->size;
+void
+stack_init (stack_t * stack, uint64_t position, uint8_t * value,
+            uint8_t v_size, uint8_t size)
+{
+    stack->position = position;
+    stack->size = size;
+    memcpy (stack->value, value, v_size);
+
+
+
+}
+
+
+intersection_t *
+intersections_join (intersection_t * intersection[], uint8_t percentage[],
+                    int dim)
+{
+
+//the left limits on the binary search
+    uint64_t llimit[dim] = { 0 };
+    stack_t stack[dim][65];
+    jnode_t jnode[dim][65] = { 0 };
+
+//used to show the position in the stack
+    int sposition[dim] = { 0 };
+
+//this needs to change in case the MAX_DIM_INTER change
+
+//these are used to hold the results of 27 reads of an intersection
+    uint64_t position[28];      //27+1 see linear search
+    uint64_t key[27];
+    uint8_t value[27][MAX_DIM_INTER - 1];
+    uint8_t size[27];
+
+    jlist_t jlist;
+
+//the position that is in the first stack element
+//the right limit to the binary search
+    uint64_t rlimit;
+
+//max_height will be used on jlist_init to define the maximum heiht of the skiplist
+
+
+    int result_size = intersection[0]->size;
+    int result_dim = 0;
+    int max_height = 0;
     int iter;
     for (iter = 0; iter < dim; iter++) {
-        if (min_size > column[iter]->size) {
-            min_size = column[iter]->size;
+        if (result_size > intersection[iter]->size) {
+            result_size = intersection[iter]->size;
         }
-//set the llimits and the positions to -1
-        join->llimit[iter].position = 0;
-        join->position[iter] = -1;
+        max_height += (int) log2 (intersection -[iter]->size) + 1;
+        result_dim += intersection[iter]->dim;
+
+//setting the position of the first stack element to intersection->size
+//so as to be picked by rlimit when we need to return or start from the
+//beginning
+
+        stack[iter][0].position = intersection[iter]->size;
+
     }
-//a small memory upper limit
-    uint8_t *result =
-        calloc (min_size + (int) ((1 / 3) * min_size + 1) * (dim - 1), 1);
 
-    int res_pos = 0;            //the position where we write on result
-
-
-
-    jnode_t *min_node;          //the current minimum key on the jlist,ie jlist->head->next[0]
-
-    key = varint_bread (column[0]->buffer, join->llimit[0].position, &size);
-    value = varint_sread (column[0]->buffer, join->llimit[0].position + size);
-    jnode_init (&(join->barray[0][join->position[0] + 1]),
-                key, size, join->llimit[0].position, value);
-    jlist_add (join->jlist, &(join->barray[0][join->position[0] + 1]));
-
-    join->position[0]++;
-    min_node = join->barray[0] + join->position[0];
-    int cur_dim = 0;
+//finding the minimum possible upper limit of the size by taking into acount 
+//the fact that varint varries ftom 10 to 2 in our case and values are 1.
+    result_size =
+        ((int) result_size * 10 / 11) + 1 +
+        result_dim * (result_size * 1 / 3);
 
 
+//initializing the jlist
+    jlist_init (&jlist, max_height);
+
+//this is the current minimum node in the jlist;
+//this is the node new nodes compare to.
+
+    jnode_t *min_node;
+
+//we pick the first min_node from the 0 intersection
+//to initialize the loop
+
+//update the stack pointer
+    sposition[0]++;
+
+//read the key
+    key[0] = varint_bread (intersection[0]->buffer, llimit[0], &size[0]);
+
+//obtain the values
+    for (iter = 0; iter < intersection[0]->dim; iter++) {
+        value[0][iter] =
+            varint_sread (intersection[0]->buffer,
+                          llimit[0] + size[0] + iter);
+    }
+//init the jnode
+    jnode_init (&(jnode[0][sposition[0]]), key[0], intersection[0]->dim);
+//init the stack node
+    stack_init (&(stack[0][sposition[0]]), 0, value[0], intersection[0]->dim,
+                size[0]);
+
+//add the jnode in the jlist
+    jlist_add (&jlist, &(jnode[0][sposition[0]]));
+
+
+//pick it as the initial min_node
+    min_node = &(jnode[0][sposition[0]]);
+
+
+//main loop
     while (1) {
+
+
+//varriable that shows if all intesections have this key
         int common = 1;
+
+//loop on all intersections searching for the key
         for (iter = 0; iter < dim; iter++) {
-            if (iter != cur_dim) {
-                int comp = 1;
-                while (comp == 1) {
 
-                    uint64_t rlimit;
-                    if (join->position[iter] >= 0) {
-                        rlimit =
-                            join->barray[iter][join->position[iter]].position;
-                    }
-                    else {
-                        if (join->llimit[iter].position == column[iter]->size) {
-                            goto end;
-                        }
-                        rlimit = column[iter]->size;
+//varrible that shows whether the current last element in the stack is
+//greater or lower or equal than the min_node
+            int comp = 1;
 
-                    }
+//if greater search for a smaller element with binary search
+            while (comp == 1) {
 
-                    if (join->llimit[iter].position + 24 > rlimit) {
+//when the left limit of any intersection buffer reaches the size of the buffer
+//we have finished our work
 
+                if (llimit[iter] >= intersection->size) {
+                    goto end;
 
+                }
 
-                        int counter_ = 0;
-                        uint64_t position_[9];
-                        uint64_t key_[8];
-                        uint8_t value_[8];
-                        uint8_t size_[8];
-                        position_[0] = join->llimit[iter].position;
+//we update the rlimit
+                rlimit = stack[iter][sposition[iter]].position;
+
+//if the search interval is small we do a linear search for the next node
+//otherwise we do a binary search between llimit[iter] and rlimit
 
 
-                        while (position_[counter_] < rlimit) {
-                            key_[counter_] =
-                                varint_bread (column[iter]->buffer,
-                                              position_[counter_],
-                                              &size_[counter_]);
-                            position_[counter_ + 1] = size_[counter_] + position_[counter_];    //position at m for node m-1
-                            value_[counter_] =
-                                varint_sread (column[iter]->buffer,
-                                              position_[counter_] +
-                                              size_[counter_]);
-                            position_[counter_ + 1]++;
-                            counter_++;
-                        }
+                if (llimit[iter] + min_bracket > rlimit) {
+//the number of keys/nodes found in the linear search inside the bracket;
+                    int counter = 0;
+
+//we start at the llimit
+                    position[0] = llimit[iter];
+
+//until we reach the rlimit
+                    while (position[counter] < rlimit) {
+
+//read the key
+                        key[counter] =
+                            varint_bread (intersection[iter]->buffer,
+                                          position[counter], &size[counter]);
+
+//obtain the values
                         int siter;
-                        for (siter = 1; siter < counter_ + 1; siter++) {
-                            jnode_init (&
-                                        (join->barray[iter][siter +
-                                                            join->position
-                                                            [iter]]),
-                                        key_[counter_ - siter],
-                                        size_[counter_ - siter],
-                                        position_[counter_ - siter],
-                                        value_[counter_ - siter]);
-                            jlist_add (join->jlist, &(join->barray[iter]
-                                                      [siter +
-                                                       join->position
-                                                       [iter]]));
+                        for (siter = 0; siter < intersection[iter]->dim;
+                             siter++) {
+                            value[counter][siter] =
+                                varint_sread (intersection[iter]->buffer,
+                                              position + size[counter] +
+                                              siter);
                         }
-                        join->position[iter] += counter_;
-
-                        comp = comp_jnode_t
-                            (&(join->barray[iter][join->position[iter]]),
-                             min_node);
-
-                        break;
+                        position[counter + 1] =
+                            position[counter] + size[counter] +
+                            intersection[iter]->dim;
+                        counter++;
                     }
-                    else {
 
-                        uint8_t size;
-                        position =
-                            column_middle (column[iter],
-                                           join->llimit[iter].position,
-                                           rlimit, &key, &size);
-                        value =
-                            varint_sread (column[iter]->buffer,
-                                          position + size);
+//write the results to the stack and jnode
+//order them correctly
+                    for (siter = 1; siter <= counter; siter++) {
 
-                        jnode_init (&(join->barray[iter]
-                                      [join->position[iter] + 1]), key, size,
-                                    position, value);
-                        jlist_add (join->jlist,
-                                   &(join->barray[iter][join->position[iter] +
-                                                        1]));
-                        join->position[iter]++;
+//init the jnode
+                        jnode_init (&(jnode[iter][sposition[iter] + siter]),
+                                    key[counter - siter],
+                                    intersection[iter]->dim);
+//init the stack node
+                        stack_init (&(stack[iter][sposition[iter] + siter]),
+                                    position[counter - siter],
+                                    value[counter - siter],
+                                    intersection[iter]->dim,
+                                    size[counter - siter]);
 
-                        comp = comp_jnode_t
-                            (&(join->barray[iter][join->position[iter]]),
-                             min_node);
-
+//add the jnode in the jlist
+                        jlist_add (&jlist,
+                                   &(jnode[iter][sposition[iter] + siter]));
 
                     }
 
-                }
-                if (comp < 0) {
-                    min_node = join->barray[iter] + join->position[iter];
-                    cur_dim = iter;
-                    common = 0;
+//update the sposition
+                    sposition[iter] += counter;
+
+//compare with min_node
+                    comp =
+                        comp_jnode_t (&(jnode[iter][sposition[iter]]),
+                                      min_node);
+
+//after a linear search we have searched through all the keys of this bracket
+//so we break, the min_node will have to change
+
                     break;
+
                 }
-                if (comp > 0) {
-                    //check jlist_add to learn why you should not change this
-                    while (jlist_first (join->jlist)->key !=
-                           join->barray[iter][join->position[iter]].key) {
+                else {
 
-                        join->llimit[(jlist_first (join->jlist))->dim].
-                            position =
-                            (jlist_first (join->jlist))->position +
-                            (jlist_first (join->jlist))->size + 1;
-                        join->position[(jlist_first (join->jlist))->dim]--;
-                        jlist_delete (join->jlist,
-                                      (jlist_first (join->jlist))->key);
+//update the stack pointer
+                    sposition[0]++;
+
+//we find the position with binary search on the bracket
+                    position[0] =
+                        intersection_middle (intersection[iter], llimit[iter],
+                                             rlimit, &(key[0]), &(size[0]));
 
 
-
-
+//obtain the values
+                    for (siter = 0; iter < intersection[iter]->dim; siter++) {
+                        value[0][siter] =
+                            varint_sread (intersection[iter]->buffer,
+                                          position[0] + size[0] + siter);
                     }
+//init the jnode
+                    jnode_init (&(jnode[iter][sposition[iter]]),
+                                key[0], intersection[iter]->dim);
+//init the stack node
+                    stack_init (&(stack[iter][sposition[iter]]), 0, value[0],
+                                intersection[iter]->dim, size[0]);
+
+//add the jnode in the jlist
+                    jlist_add (&jlist, &(jnode[iter][sposition[iter]]));
 
 
+//compare with min_node
+                    comp =
+                        comp_jnode_t (&(jnode[iter][sposition[iter]]),
+                                      min_node);
 
-
-
-                    min_node = join->barray[iter] + join->position[iter];
-                    cur_dim = iter;
-
-                    common = 0;
-                    break;
                 }
-
-
             }
+//now we have added one or more nodes to the jlist and we have updated the sposition[iter]
+
+//2 cases
+
+            if (comp < 0) {
+
+//the new node is smaller,so we update the min_node
+                min_node = &(jnode[iter][sposition[iter]]);
+
+//the previous min_node is not a common element
+                common = 0;
+//we break the for loop to start from the beggining
+                break;
+            }
+
+//this is when we have done a linear search and the last node is still bigger
+
+            if (comp > 0) {
+
+//we remove all nodes bigger than the current
+
+                jnode_t *jtemp = jlist_first (&jlist);
+                while (jtemp->key != jnode[iter][sposition[iter]].key) {
+
+
+//update all the stacks that are referenced by this jnode
+
+                    for (siter = 0; siter < jtemp->dim_size; siter++) {
+
+//update the left limit
+                        llimit[jtemp->dim[siter]] =
+                            stack[jtemp->dim[siter]][sposition
+                                                     [jtemp->
+                                                      dim[siter]]].position +
+                            stack[jtemp->dim[siter]][sposition
+                                                     [jtemp->
+                                                      dim[siter]]].size +
+                            intersection[jtemp->dim[siter]]->dim;
+
+//update the position
+                        sposition[jtemp->dim[siter]]--;
+                    }
+
+//remove the jnode from the jlist
+                    jlist_delete (&jlist, jtemp);
+
+                    jtemp = jlist_first (&jlist);
+                }
+
+//we set as min_node the new node
+                min_node = &(jnode[iter][sposition[iter]]);
+
+//the previous min_node is not a common element
+                common = 0;
+
+//we break the for loop since this is a new elm and we need to start from the beginning
+                break;
+            }
+        }
+
+//in case we found a common key
+
+        if (common) {
+
+
+
 
 
 
 
         }
-//this is the last comp
-        if (common == 1) {
-//remove the only node from the skiplist
-
-            jlist_delete (join->jlist, min_node->key);
-
-//store the result TODO create an intersection object
-
-            res_pos += varint_write (result, res_pos, min_node->key);
-            for (iter = 0; iter < dim; iter++) {
-                assert (join->barray[iter][join->position[iter]].key ==
-                        min_node->key);
-                varint_write (result, res_pos,
-                              join->barray[iter][join->position[iter]].value);
-                res_pos++;
-
-                join->llimit[iter].position =
-                    join->barray[iter][join->position[iter]].position +
-                    join->barray[iter][join->position[iter]].size + 1;
-                join->position[iter]--;
 
 
-
-
-            }
-
-
-            key =
-                varint_bread (column[0]->buffer, join->llimit[0].position,
-                              &size);
-            value =
-                varint_sread (column[0]->buffer,
-                              join->llimit[0].position + size);
-            jnode_init (&(join->barray[0][join->position[0] + 1]), key, size,
-                        join->llimit[0].position, value);
-            jlist_add (join->jlist,
-                       &(join->barray[0][join->position[0] + 1]));
-
-            join->position[iter]++;
-            min_node = join->barray[0] + join->position[0];
-            cur_dim = 0;
-
-
-
-
-
-
-
-
-        }
 
     }
+
+
+
+
   end:;
 
-    uint64_t uid[dim];
-    for (iter = 0; iter < dim; iter++) {
-        uid[iter] = column[iter]->uid;
-    }
-    result = realloc (result, res_pos);
-    return intersection_new (uid, percentage, result, res_pos, dim);
+
+
 }

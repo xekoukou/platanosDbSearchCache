@@ -35,29 +35,16 @@
 
 struct column_t_
 {
-    uint64_t uid;
-    uint8_t percentage;
+    uint64_t *uid;
+    uint8_t *percentage;
     uint8_t *buffer;
     uint64_t size;
+    uint8_t dim;
       RB_ENTRY (column_t_) field;
 
 };
 
 typedef struct column_t_ column_t;
-
-void column_init (column_t ** column, uint64_t uid, uint8_t percentage);
-void column_destroy (column_t ** column);
-
-
-
-
-//used by the join function
-//returns the position
-//key is the key at that position
-//size is the size of the key in varint
-uint64_t
-column_middle (struct column_t_ *column, uint64_t start, uint64_t end,
-               uint64_t * key, uint8_t * size);
 
 
 
@@ -71,42 +58,30 @@ typedef struct
 } intersection_t;
 
 
-intersection_t *intersection_new (uint64_t * uid, uint8_t * percentage,
+intersection_t *intersection_enew (uint64_t * uid, uint8_t * percentage,
                                   uint8_t * buffer, uint64_t size,
                                   uint8_t dim);
+//creates a buffer
+intersection_t *
+intersection_inew (uint64_t * uid, uint8_t * percentage,
+                   uint8_t dim);
+
 
 void intersection_destroy (intersection_t ** intersection);
 
 
-typedef struct
-{
-    uint64_t position;
 
-} llimit_t;
+//used by the join function
+//returns the position
+//key is the key at that position
+//size is the size of the key in varint
 
-//TODO position why here??
-struct join_t_
-{
-    jlist_t *jlist;
-    jnode_t **barray;
-    llimit_t *llimit;           //left bracket limit used for the bsearch
-    int size;                   //the barray_size
-    int dim;
-    int *position;
-};
-
-
-typedef struct join_t_ join_t;
-
-void join_new (join_t ** join, int max_dim, int max_size);
-
-void join_destroy (join_t ** join);
+uint64_t
+intersection_middle (intersection_t *intersection, uint64_t start, uint64_t end,
+               uint64_t * key, uint8_t * size);
 
 
 
-//both percentage and column need to be of dimension dim
-intersection_t *join_columns (join_t * join, struct column_t_ *column[],
-                              uint8_t percentage[], int dim);
 
 
 #endif
