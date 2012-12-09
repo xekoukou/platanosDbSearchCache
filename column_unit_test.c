@@ -74,12 +74,13 @@ main ()
         uint8_t size;
         uint64_t key = varint_read (intersection->buffer, position, &size);
         position += size;
-        uint64_t value1 = varint_read (intersection->buffer, position + 1, &size);
-        uint64_t value2 = varint_read (intersection->buffer, position + 2, &size);
-        uint64_t value3 = varint_read (intersection->buffer, position + 3, &size);
-        uint64_t value4 = varint_read (intersection->buffer, position + 4, &size);
-        uint64_t value5 = varint_read (intersection->buffer, position + 5, &size);
-        assert (size == 1);
+        uint8_t siz;
+        uint64_t value1 = varint_read (intersection->buffer, position, &siz);
+        uint64_t value2 = varint_read (intersection->buffer, position+1, &siz);
+        uint64_t value3 = varint_read (intersection->buffer, position+2, &siz);
+        uint64_t value4 = varint_read (intersection->buffer, position+3, &siz);
+        uint64_t value5 = varint_read (intersection->buffer, position+4, &siz);
+        assert (siz == 1);
         position+=5;
         printf
             ("\nkey:%lu value1:%lu value2:%lu value3:%lu value4:%lu value5:%lu ",

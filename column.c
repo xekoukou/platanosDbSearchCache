@@ -154,7 +154,7 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
 //these are used to hold the results of 27 reads of an intersection
     uint64_t position[28];      //27+1 see linear search
     uint64_t key[27];
-    uint8_t value[27][MAX_DIM_INTER - 1];
+    uint8_t value[27][MAX_DIM_INTER];
     uint8_t size[27];
 
     jlist_t jlist;
@@ -198,7 +198,8 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
     int res_pos = 0;
 
 //ordering the uids of the intersections
-    uint8_t order[2][MAX_DIM_INTER * dim][2];
+//this needs to change in case MAX_DIM_INTER change
+    uint8_t order[2][400][2];   //MAX_DIM_INTER^2
     memset (order, 0, sizeof (order));
     int merge_size[2] = { 0 };
 
@@ -207,6 +208,7 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
     for (iter = 0; iter < intersection[0]->dim; iter++) {
         order[0][iter][1] = iter;
     }
+    merge_size[0] = intersection[0]->dim;
 
 //make the merge
 
@@ -214,7 +216,7 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
     uint8_t flip = 0;
     uint8_t flipo;
 
-    for (iter = 1; iter <= dim; iter++) {
+    for (iter = 1; iter < dim; iter++) {
         flipo = flip;
         flip = iter & 0x1;
 
@@ -244,6 +246,7 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
 
 
                     }
+                    merge_size[flip] += merge_size[flipo] - point1;
 
                     break;
 
@@ -263,11 +266,12 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
                     int siter;
                     for (siter = point2; siter < intersection[iter]->dim;
                          siter++) {
-                        order[flip][siter + point1][0] = order[flipo][siter][0];
-                        order[flip][siter + point1][1] = order[flipo][siter][1];
+                        order[flip][siter + point1][0] = iter;
+                        order[flip][siter + point1][1] = siter;
 
 
                     }
+                    merge_size[flip] += intersection[iter]->dim - point2;
 
                     break;
 
@@ -488,11 +492,11 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
 //update the left limit
                         llimit[jtemp->dim[siter]] =
                             stack[jtemp->dim[siter]][sposition
-                                                     [jtemp->
-                                                      dim[siter]]].position +
-                            stack[jtemp->dim[siter]][sposition
-                                                     [jtemp->dim[siter]]].size +
-                            intersection[jtemp->dim[siter]]->dim;
+                                                     [jtemp->dim[siter]]].
+                            position +
+                            stack[jtemp->
+                                  dim[siter]][sposition[jtemp->dim[siter]]].
+                            size + intersection[jtemp->dim[siter]]->dim;
 
 //update the position
                         sposition[jtemp->dim[siter]]--;
