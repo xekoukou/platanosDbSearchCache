@@ -352,8 +352,8 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
                 rlimit = stack[iter][sposition[iter]].position;
 
 
-                printf ("\ndim:%d llimit:%lu rlimit:%lu", iter, llimit[iter],
-                        rlimit);
+           //     printf ("\ndim:%d llimit:%lu rlimit:%lu", iter, llimit[iter],
+           //             rlimit);
 //if the search interval is small we do a linear search for the next node
 //otherwise we do a binary search between llimit[iter] and rlimit
 
