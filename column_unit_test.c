@@ -12,11 +12,11 @@ main ()
 
     uint64_t common_value = 11110;
 
-    int j;
+    uint64_t j;
 
     for (j = 0; j < 5; j++) {
-
-        column_init (&column[j], 1, 80);
+        uint8_t perce=80;
+        column[j]=column_inew (&j,&perce,1);
 
         uint64_t position = 0;
         int i;
@@ -43,7 +43,7 @@ main ()
     }
 
     for (j = 0; j < 5; j++) {
-        printf ("\ncolumn %d size:%lu", j, column[j]->size);
+        printf ("\ncolumn %lu size:%lu", j, column[j]->size);
 
         uint64_t position = 0;
         while (position < column[j]->size) {
@@ -63,9 +63,7 @@ main ()
     intersection_t *intersection;
     uint8_t percentage[] = { 90, 90, 90, 90, 90 };
 
-    join_t *join;
-    join_new(&join,5,5000000);
-    intersection = join_columns (join,column, percentage, 5);
+    intersection =intersections_join  ((intersection_t **) column, percentage, 5);
     assert (intersection->buffer != NULL);
 
 

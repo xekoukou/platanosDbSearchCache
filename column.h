@@ -59,12 +59,15 @@ typedef struct
 
 
 intersection_t *intersection_enew (uint64_t * uid, uint8_t * percentage,
-                                  uint8_t * buffer, uint64_t size,
-                                  uint8_t dim);
+                                   uint8_t * buffer, uint64_t size,
+                                   uint8_t dim);
 //creates a buffer
-intersection_t *
-intersection_inew (uint64_t * uid, uint8_t * percentage,
-                   uint8_t dim);
+intersection_t *intersection_inew (uint64_t * uid, uint8_t * percentage,
+                                   uint8_t dim);
+
+//the only difference is that we also allocate some memory for the
+//red black tree
+column_t *column_inew (uint64_t * uid, uint8_t * percentage, uint8_t dim);
 
 
 void intersection_destroy (intersection_t ** intersection);
@@ -77,10 +80,12 @@ void intersection_destroy (intersection_t ** intersection);
 //size is the size of the key in varint
 
 uint64_t
-intersection_middle (intersection_t *intersection, uint64_t start, uint64_t end,
-               uint64_t * key, uint8_t * size);
+intersection_middle (intersection_t * intersection, uint64_t start,
+                     uint64_t end, uint64_t * key, uint8_t * size);
 
 
+intersection_t *intersections_join (intersection_t * intersection[],
+                                    uint8_t percentage[], int dim);
 
 
 
