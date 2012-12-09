@@ -135,7 +135,7 @@ stack_init (stack_t * stack, uint64_t position, uint8_t * value,
 
 intersection_t *
 intersections_join (intersection_t * intersection[], uint8_t percentage[],
-                    int dim)
+                    int dim, int res_dim)
 {
 
 //the left limits on the binary search
@@ -352,8 +352,8 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
                 rlimit = stack[iter][sposition[iter]].position;
 
 
-           //     printf ("\ndim:%d llimit:%lu rlimit:%lu", iter, llimit[iter],
-           //             rlimit);
+                //     printf ("\ndim:%d llimit:%lu rlimit:%lu", iter, llimit[iter],
+                //             rlimit);
 //if the search interval is small we do a linear search for the next node
 //otherwise we do a binary search between llimit[iter] and rlimit
 
@@ -492,11 +492,11 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
 //update the left limit
                         llimit[jtemp->dim[siter]] =
                             stack[jtemp->dim[siter]][sposition
-                                                     [jtemp->dim[siter]]].
-                            position +
-                            stack[jtemp->
-                                  dim[siter]][sposition[jtemp->dim[siter]]].
-                            size + intersection[jtemp->dim[siter]]->dim;
+                                                     [jtemp->
+                                                      dim[siter]]].position +
+                            stack[jtemp->dim[siter]][sposition
+                                                     [jtemp->dim[siter]]].size +
+                            intersection[jtemp->dim[siter]]->dim;
 
 //update the position
                         sposition[jtemp->dim[siter]]--;
@@ -523,24 +523,46 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
 
         if (common) {
 
-//we write the result
+//we filter results when the percentage is lower than required
+//percentage need to be ordered
+            int filter = 0;
+            assert (merge_size[flip] == res_dim);
 
-            res_pos += varint_write (result, res_pos, min_node->key);
-
-//we use the order[flip] and merge_size[flip]
             for (iter = 0; iter < merge_size[flip]; iter++) {
 
-                assert (jnode[order[flip][iter][0]]
-                        [sposition[order[flip][iter][0]]].key == min_node->key);
-                varint_write (result, res_pos,
-                              stack[order[flip][iter][0]][sposition
-                                                          [order[flip][iter]
-                                                           [0]]].value[order
-                                                                       [flip]
-                                                                       [iter]
-                                                                       [1]]);
-                res_pos++;
 
+                if (percentage[iter] > stack[order[flip][iter][0]][sposition
+                                                                   [order[flip]
+                                                                    [iter]
+                                                                    [0]]].value
+                    [order[flip]
+                     [iter]
+                     [1]]) {
+                    filter = 1;
+                    break;
+                }
+            }
+            if (!filter) {
+//we write the result
+
+                res_pos += varint_write (result, res_pos, min_node->key);
+
+//we use the order[flip] and merge_size[flip]
+                for (iter = 0; iter < merge_size[flip]; iter++) {
+
+                    assert (jnode[order[flip][iter][0]]
+                            [sposition[order[flip][iter][0]]].key ==
+                            min_node->key);
+                    varint_write (result, res_pos,
+                                  stack[order[flip][iter][0]][sposition
+                                                              [order[flip][iter]
+                                                               [0]]].value[order
+                                                                           [flip]
+                                                                           [iter]
+                                                                           [1]]);
+                    res_pos++;
+
+                }
             }
 
 //update the sposition and the llimit

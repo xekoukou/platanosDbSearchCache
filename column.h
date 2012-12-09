@@ -83,9 +83,10 @@ uint64_t
 intersection_middle (intersection_t * intersection, uint64_t start,
                      uint64_t end, uint64_t * key, uint8_t * size);
 
-
+//dim is the number of intersections used
+//res_dim is the dimension of the result- it equals the size of percentage
 intersection_t *intersections_join (intersection_t * intersection[],
-                                    uint8_t percentage[], int dim);
+                                    uint8_t percentage[], int dim, int res_dim);
 
 
 
