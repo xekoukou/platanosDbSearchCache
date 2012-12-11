@@ -33,20 +33,6 @@
 
 
 
-struct column_t_
-{
-    uint64_t *uid;
-    uint8_t *percentage;
-    uint8_t *buffer;
-    uint64_t size;
-    uint8_t dim;
-      RB_ENTRY (column_t_) field;
-
-};
-
-typedef struct column_t_ column_t;
-
-
 
 typedef struct
 {
@@ -64,10 +50,6 @@ intersection_t *intersection_enew (uint64_t * uid, uint8_t * percentage,
 //creates a buffer
 intersection_t *intersection_inew (uint64_t * uid, uint8_t * percentage,
                                    uint8_t dim);
-
-//the only difference is that we also allocate some memory for the
-//red black tree
-column_t *column_inew (uint64_t * uid, uint8_t * percentage, uint8_t dim);
 
 
 void intersection_destroy (intersection_t ** intersection);

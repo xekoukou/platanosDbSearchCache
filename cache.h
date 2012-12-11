@@ -1,55 +1,34 @@
+/*
+    Copyright contributors as noted in the AUTHORS file.
+                
+    This file is part of PLATANOS.
+
+    PLATANOS is free software; you can redistribute it and/or modify it under
+    the terms of the GNU Affero General Public License as published by
+    the Free Software Foundation; either version 3 of the License, or
+    (at your option) any later version.
+            
+    PLATANOS is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+        
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+
 #ifndef PLATANOS_DB_SEARCH_CACHE_H_
 #define PLATANOS_DB_SEARCH_CACHE_H_
 
 
 #include"column.h"
-#include"tree/tree.h"
+#include"hash/khash.h"
+#include<stdlib.h>
+KHASH_MAP_INIT_INT64 (columns, intersection_t);
 
+//the uid of the person is used to insert the structure into the hash
+KHASH_MAP_INIT_INT64 (persons, khash_t(columns));
 
-int cmp_column_t (struct column_t_ *first, struct column_t_ *second);
-
-RB_HEAD (columns_rb_t, column_t_);
-RB_PROTOTYPE (columns_rb_t, column_t_, field, cmp_column_t);
-
-typedef struct columns_rb_t columns_rb_t;
-
-struct person_t_
-{
-
-    uint64_t uid;
-    columns_rb_t columns_rb;
-      RB_ENTRY (person_t_) field;
-
-};
-int cmp_person_t (struct person_t_ *first, struct person_t_ *second);
-
-RB_HEAD (persons_rb_t, person_t_);
-RB_PROTOTYPE (persons_rb_t, person_t_, field, cmp_person_t);
-
-
-typedef struct persons_rb_t persons_rb_t;
-typedef struct person_t_ person_t;
-
-
-void person_init (person_t ** person, uint64_t uid);
-
-void person_destroy (person_t ** person);
-
-struct db_scache_t_
-{
-
-    persons_rb_t persons_rb;
-
-};
-
-
-typedef struct db_scache_t_ db_scache_t;
-
-
-void db_scache_init (db_scache_t ** db_scache);
-
-void db_scache_destroy (db_scache_t ** db_scache);
-
-person_t *db_scache_psearch (db_scache_t * db_scache, person_t * person);
 
 #endif

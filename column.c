@@ -16,6 +16,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
 //check jlist.h if you change these
 //also intersection_join
 #define MAX_BUF_SIZE 5242880
@@ -93,24 +94,6 @@ intersection_destroy (intersection_t ** intersection)
 
 }
 
-//the only difference is that we also allocate some memory for the
-//red black tree
-column_t *
-column_inew (uint64_t * uid, uint8_t * percentage, uint8_t dim)
-{
-    column_t *intersection = malloc (sizeof (column_t));
-    intersection->dim = dim;
-    intersection->uid = malloc (sizeof (uint64_t) * dim);
-    intersection->percentage = malloc (sizeof (uint8_t) * dim);
-    intersection->buffer = (uint8_t *) malloc (MAX_BUF_SIZE);
-    intersection->size = MAX_BUF_SIZE;
-
-
-    memcpy (intersection->uid, uid, sizeof (uint64_t) * dim);
-    memcpy (intersection->percentage, percentage, sizeof (uint8_t) * dim);
-
-    return intersection;
-}
 
 
 typedef struct
