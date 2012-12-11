@@ -142,6 +142,7 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
     uint64_t llimit[dim];
     memset (llimit, 0, sizeof (llimit));
     stack_t stack[dim][65];
+    jnode_t *jnode_ptr[dim][65];
     jnode_t jnode[dim][65];
     memset (jnode, 0, sizeof (jnode));
 
@@ -158,6 +159,7 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
     uint8_t size[27];
 
     jlist_t jlist;
+
 
 //the position that is in the first stack element
 //the right limit to the binary search
@@ -182,6 +184,9 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
 //beginning
 
         stack[iter][0].position = intersection[iter]->size;
+
+//init the pointers
+        jnode_ptr[iter][0] = &(jlist.head);
 
     }
 //the max_height is the log2 of the maximum number of elements
@@ -309,18 +314,21 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
             varint_sread (intersection[0]->buffer, llimit[0] + size[0] + iter);
     }
 //init the jnode
-    jnode_clear (&(jnode[0][sposition[0]]));
+    jnode_clear ((&(jnode[0][sposition[0]])));
     jnode_init (&(jnode[0][sposition[0]]), key[0], 0);
 //init the stack node
     stack_init (&(stack[0][sposition[0]]), 0, value[0], intersection[0]->dim,
                 size[0]);
 
 //add the jnode in the jlist
-    jlist_add (&jlist, &(jnode[0][sposition[0]]));
+    jnode_ptr[0][sposition[0]] =
+        jlist_add (&jlist, &(jlist.head), &(jnode[0][sposition[0]]));
 
+    //printf ("\ndim:%d added node with key:%lu at sposition%d", 0,
+    //        jnode[0][sposition[0]].key, sposition[0]);
 
 //pick it as the initial min_node
-    min_node = &(jnode[0][sposition[0]]);
+    min_node = jnode_ptr[0][sposition[0]];
 
 
 //main loop
@@ -332,6 +340,24 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
 
 //loop on all intersections searching for the key
         for (iter = 0; iter < dim; iter++) {
+
+/*
+            printf ("\nall elements\n");
+            jnode_t *this = jlist.head.next;
+            while (this) {
+                printf ("node, key:%lu dim:%d ", this->key, this->dim[0]);
+                this = this->next;
+            }
+
+            printf ("\nall elements reversed\n");
+            this = min_node;
+            while (this->key != 0) {
+                printf ("node, key:%lu dim:%d ", this->key, this->dim[0]);
+                this = this->prev;
+            }
+
+*/
+
 
 //varrible that shows whether the current last element in the stack is
 //greater or lower or equal than the min_node
@@ -352,77 +378,135 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
                 rlimit = stack[iter][sposition[iter]].position;
 
 
-                //     printf ("\ndim:%d llimit:%lu rlimit:%lu", iter, llimit[iter],
-                //             rlimit);
+                //       printf ("\ndim:%d llimit:%lu rlimit:%lu", iter, llimit[iter],
+                //               rlimit);
 //if the search interval is small we do a linear search for the next node
 //otherwise we do a binary search between llimit[iter] and rlimit
 
-
                 if (llimit[iter] + min_bracket > rlimit) {
 //the number of keys/nodes found in the linear search inside the bracket;
-                    int counter = 0;
+                    if (llimit[iter] == rlimit) {
+                        comp =
+                            comp_jnode_t (&(jnode[iter][sposition[iter]]),
+                                          min_node);
+
+                        assert (comp >= 0);
+
+                    }
+                    else {
+
+
+                        int counter = 0;
 
 //we start at the llimit
-                    position[0] = llimit[iter];
+                        position[0] = llimit[iter];
 
 //until we reach the rlimit
-                    while (position[counter] < rlimit) {
+                        while (position[counter] < rlimit) {
 
 //read the key
-                        key[counter] =
-                            varint_bread (intersection[iter]->buffer,
-                                          position[counter], &size[counter]);
+                            key[counter] =
+                                varint_bread (intersection[iter]->buffer,
+                                              position[counter],
+                                              &size[counter]);
 
 //obtain the values
-                        int siter;
-                        for (siter = 0; siter < intersection[iter]->dim;
-                             siter++) {
-                            value[counter][siter] =
-                                varint_sread (intersection[iter]->buffer,
-                                              position[counter] +
-                                              size[counter] + siter);
+                            int siter;
+                            for (siter = 0; siter < intersection[iter]->dim;
+                                 siter++) {
+                                value[counter][siter] =
+                                    varint_sread (intersection[iter]->buffer,
+                                                  position[counter] +
+                                                  size[counter] + siter);
+                            }
+                            position[counter + 1] =
+                                position[counter] + size[counter] +
+                                intersection[iter]->dim;
+                            counter++;
                         }
-                        position[counter + 1] =
-                            position[counter] + size[counter] +
-                            intersection[iter]->dim;
-                        counter++;
-                    }
 
 //write the results to the stack and jnode
 //order them correctly 
-                    int siter;
-                    for (siter = 1; siter <= counter; siter++) {
+                        int siter;
+                        for (siter = 1; siter <= counter; siter++) {
 
-//init the jnode
-                        jnode_clear (&(jnode[iter][sposition[iter] + siter]));
-                        jnode_init (&(jnode[iter][sposition[iter] + siter]),
-                                    key[counter - siter], iter);
+//init the jnode      
+                            sposition[iter]++;
+                            jnode_clear (&(jnode[iter][sposition[iter]]));
+                            jnode_init (&(jnode[iter][sposition[iter]]),
+                                        key[counter - siter], iter);
 //init the stack node
-                        stack_init (&(stack[iter][sposition[iter] + siter]),
-                                    position[counter - siter],
-                                    value[counter - siter],
-                                    intersection[iter]->dim,
-                                    size[counter - siter]);
-
-//add the jnode in the jlist
-                        jlist_add (&jlist,
-                                   &(jnode[iter][sposition[iter] + siter]));
-
-                    }
-
-//update the sposition
-                    sposition[iter] += counter;
+                            stack_init (&(stack[iter][sposition[iter]]),
+                                        position[counter - siter],
+                                        value[counter - siter],
+                                        intersection[iter]->dim,
+                                        size[counter - siter]);
 
 //compare with min_node
-                    comp =
-                        comp_jnode_t (&(jnode[iter][sposition[iter]]),
-                                      min_node);
+                            comp =
+                                comp_jnode_t (&(jnode[iter][sposition[iter]]),
+                                              min_node);
+                            if (comp < 0) {
+                                llimit[iter] =
+                                    stack[iter][sposition[iter]].position +
+                                    stack[iter][sposition[iter]].size +
+                                    intersection[iter]->dim;
+                                sposition[iter]--;
+                                break;
+                            }
+                            else {
 
-//after a linear search we have searched through all the keys of this bracket
-//so we break, the min_node will have to change
+
+
+
+//add the jnode in the jlist
+                                jnode_ptr[iter][sposition[iter]] =
+                                    jlist_add (&jlist,
+                                               jnode_ptr[iter][sposition[iter] -
+                                                               1],
+                                               &(jnode[iter][sposition[iter]]));
+
+
+
+                                //             printf
+                                //                 ("\ndim:%d added node with key:%lu at sposition%d",
+                                //                  iter, jnode[iter][sposition[iter]].key,
+                                //                  sposition[iter]);
+                            }
+
+                        }
+
+/*
+                        if (iter == 2) {
+                            // int lol;
+                            // scanf ("%d", &lol);
+                            printf ("\nall elements\n");
+                            jnode_t *this = jlist.head.next;
+                            while (this) {
+                                printf ("node, key:%lu dim:%d ",
+                                        this->key, this->dim[0]);
+                                this = this->next;
+                            }
+
+                            printf ("\nall elements reversed\n");
+                            this = min_node;
+                            while (this->key != 0) {
+                                printf ("node, key:%lu dim:%d ",
+                                        this->key, this->dim[0]);
+                                this = this->prev;
+                            }
+
+                        }
+
+*/
+
+                    }
+                    if (comp == -1) {
+
+                        comp = 1;
+                    }
 
                     break;
-
                 }
                 else {
 
@@ -449,8 +533,6 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
                     stack_init (&(stack[iter][sposition[iter]]), position[0],
                                 value[0], intersection[iter]->dim, size[0]);
 
-//add the jnode in the jlist
-                    jlist_add (&jlist, &(jnode[iter][sposition[iter]]));
 
 
 //compare with min_node
@@ -458,31 +540,68 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
                         comp_jnode_t (&(jnode[iter][sposition[iter]]),
                                       min_node);
 
+                    if (comp < 0) {
+                        llimit[iter] =
+                            stack[iter][sposition[iter]].position +
+                            stack[iter][sposition[iter]].size +
+                            intersection[iter]->dim;
+                        sposition[iter]--;
+
+                    }
+                    else {
+
+//add the jnode in the jlist
+                        jnode_ptr[iter][sposition[iter]] =
+                            jlist_add (&jlist,
+                                       jnode_ptr[iter][sposition[iter] - 1],
+                                       &(jnode[iter][sposition[iter]]));
+
+/*
+
+                        if (iter == 2) {
+                            //   int lol;
+                            //   scanf ("%d", &lol);
+                            printf ("\nall elements\n");
+                            jnode_t *this = jlist.head.next;
+                            while (this) {
+                                printf ("node, key:%lu dim:%d ", this->key,
+                                        this->dim[0]);
+                                this = this->next;
+                            }
+
+                            printf ("\nall elements reversed\n");
+                            this = min_node;
+                            while (this->key != 0) {
+                                printf ("node, key:%lu dim:%d ", this->key,
+                                        this->dim[0]);
+                                this = this->prev;
+                            }
+
+
+                        }
+                        printf
+                            ("\ndim:%d added node with key:%lu at sposition%d",
+                             iter, jnode[iter][sposition[iter]].key,
+                             sposition[iter]);
+
+*/
+
+                    }
+                    if (comp == -1) {
+
+                        comp = 1;
+                    }
+
                 }
-            }
-//now we have added one or more nodes to the jlist and we have updated the sposition[iter]
-
-//2 cases
-
-            if (comp < 0) {
-
-//the new node is smaller,so we update the min_node
-                min_node = &(jnode[iter][sposition[iter]]);
-
-//the previous min_node is not a common element
-                common = 0;
-//we break the for loop to start from the beggining
-                break;
             }
 
 //this is when we have done a linear search and the last node is still bigger
-
             if (comp > 0) {
 
 //we remove all nodes bigger than the current
 
-                jnode_t *jtemp = jlist_first (&jlist);
-                while (jtemp->key != jnode[iter][sposition[iter]].key) {
+                jnode_t *jtemp = min_node;
+                while (jtemp->key != jnode_ptr[iter][sposition[iter]]->key) {
 
 
 //update all the stacks that are referenced by this jnode
@@ -492,24 +611,29 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
 //update the left limit
                         llimit[jtemp->dim[siter]] =
                             stack[jtemp->dim[siter]][sposition
-                                                     [jtemp->
-                                                      dim[siter]]].position +
-                            stack[jtemp->dim[siter]][sposition
-                                                     [jtemp->dim[siter]]].size +
-                            intersection[jtemp->dim[siter]]->dim;
+                                                     [jtemp->dim[siter]]].
+                            position +
+                            stack[jtemp->
+                                  dim[siter]][sposition[jtemp->dim[siter]]].
+                            size + intersection[jtemp->dim[siter]]->dim;
 
 //update the position
                         sposition[jtemp->dim[siter]]--;
                     }
 
 //remove the jnode from the jlist
-                    jlist_delete (&jlist, jtemp->key);
+                    jlist_delete (&jlist, jtemp);
 
-                    jtemp = jlist_first (&jlist);
+                    jtemp = jtemp->prev;
+                    if (!jtemp) {
+
+                        //            printf ("\njtemp iter:%d ,sposition: %d ,rlimit: %lu",
+                        //                    iter, sposition[iter], rlimit);
+                    }
                 }
 
 //we set as min_node the new node
-                min_node = &(jnode[iter][sposition[iter]]);
+                min_node = jnode_ptr[iter][sposition[iter]];
 
 //the previous min_node is not a common element
                 common = 0;
@@ -550,8 +674,8 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
 //we use the order[flip] and merge_size[flip]
                 for (iter = 0; iter < merge_size[flip]; iter++) {
 
-                    assert (jnode[order[flip][iter][0]]
-                            [sposition[order[flip][iter][0]]].key ==
+                    assert (jnode_ptr[order[flip][iter][0]]
+                            [sposition[order[flip][iter][0]]]->key ==
                             min_node->key);
                     varint_write (result, res_pos,
                                   stack[order[flip][iter][0]][sposition
@@ -574,51 +698,85 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
             }
 
 //we delete the node from the jlist
-            jlist_delete (&jlist, min_node->key);
+            jlist_delete (&jlist, min_node);
 
 // PICK A NEW MIN_NODE
 
-            if (llimit[0] != intersection[0]->size) {
+            if (min_node->prev->key != 0) {
+                min_node = min_node->prev;
+            }
+            else {
+
+                if (llimit[0] != intersection[0]->size) {
 
 //update the stack pointer
-                sposition[0]++;
+                    sposition[0]++;
 
 //read the key
-                key[0] =
-                    varint_bread (intersection[0]->buffer, llimit[0], &size[0]);
+                    key[0] =
+                        varint_bread (intersection[0]->buffer, llimit[0],
+                                      &size[0]);
 
 //obtain the values
-                for (iter = 0; iter < intersection[0]->dim; iter++) {
-                    value[0][iter] =
-                        varint_sread (intersection[0]->buffer,
-                                      llimit[0] + size[0] + iter);
-                }
+                    for (iter = 0; iter < intersection[0]->dim; iter++) {
+                        value[0][iter] =
+                            varint_sread (intersection[0]->buffer,
+                                          llimit[0] + size[0] + iter);
+                    }
 //init the jnode
-                jnode_clear (&(jnode[0][sposition[0]]));
-                jnode_init (&(jnode[0][sposition[0]]), key[0], 0);
+                    jnode_clear (&(jnode[0][sposition[0]]));
+                    jnode_init (&(jnode[0][sposition[0]]), key[0], 0);
 //init the stack node
-                stack_init (&(stack[0][sposition[0]]), llimit[0], value[0],
-                            intersection[0]->dim, size[0]);
+                    stack_init (&(stack[0][sposition[0]]), llimit[0], value[0],
+                                intersection[0]->dim, size[0]);
 
 //add the jnode in the jlist
-                jlist_add (&jlist, &(jnode[0][sposition[0]]));
+                    jnode_ptr[0][sposition[0]] =
+                        jlist_add (&jlist, jnode_ptr[0][sposition[0] - 1],
+                                   &(jnode[0][sposition[0]]));
+
+/*
+                    printf ("\nall elements\n");
+                    jnode_t *this = jlist.head.next;
+                    while (this) {
+                        printf ("node, key:%lu dim:%d ", this->key,
+                                this->dim[0]);
+                        this = this->next;
+                    }
+
+                    printf ("\nall elements reversed\n");
+                    this = min_node;
+                    while (this->key != 0) {
+                        printf ("node, key:%lu dim:%d ", this->key,
+                                this->dim[0]);
+                        this = this->prev;
+                    }
+
+
+
+                    printf ("\ndim:%d added node with key:%lu at sposition%d",
+                            iter, jnode[iter][sposition[iter]].key,
+                            sposition[iter]);
+
+
+*/
 
 
 //pick it as the initial min_node
-                min_node = &(jnode[0][sposition[0]]);
+                    min_node = jnode_ptr[0][sposition[0]];
 
-            }
-            else {
+                }
+                else {
 //we reached at the end of intersection[0]
-                goto end;
+                    goto end;
+
+                }
+
+
 
             }
-
-
 
         }
-
-
 
     }
 

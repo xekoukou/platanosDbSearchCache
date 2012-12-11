@@ -25,18 +25,27 @@ main ()
             if ((common_value < 256 + 256 * (i + 1))
                 && (common_value > 256 * (i + 1))) {
                 size = varint_write (column[j]->buffer, position, common_value);
+
+                position += size;
+
+                varint_write (column[j]->buffer, position, 92);
+
+                position++;
+
+
             }
             else {
                 uint64_t value = rand () % 256 + 256 * (i + 1);
                 size = varint_write (column[j]->buffer, position, value);
 
 
+
+                position += size;
+
+                varint_write (column[j]->buffer, position, rand () % 100);
+
+                position++;
             }
-            position += size;
-
-            varint_write (column[j]->buffer, position, rand () % 100);
-
-            position++;
         }
 
         column[j]->size = position;
