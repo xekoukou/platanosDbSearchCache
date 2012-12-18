@@ -21,7 +21,6 @@
 //also intersection_join
 #define MAX_BUF_SIZE 5242880
 #define MAX_DIM_INTER 20
-#define min_bracket (20*2 +2*MAX_DIM_INTER +1)
 
 #include"column.h"
 
@@ -174,6 +173,9 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
     }
 //the max_height is the log2 of the maximum number of elements
     max_height = (int) log2 (max_height) + 1;
+
+//the minimum bracket required to do binary search, outhwise we do linear search
+    int min_bracket = 20 * 2 + 2 * result_dim + 1;
 
 //finding the minimum possible upper limit of the size by taking into acount 
 //the fact that varint varries ftom 10 to 2 in our case and values are 1.
@@ -594,11 +596,11 @@ intersections_join (intersection_t * intersection[], uint8_t percentage[],
 //update the left limit
                         llimit[jtemp->dim[siter]] =
                             stack[jtemp->dim[siter]][sposition
-                                                     [jtemp->dim[siter]]].
-                            position +
-                            stack[jtemp->
-                                  dim[siter]][sposition[jtemp->dim[siter]]].
-                            size + intersection[jtemp->dim[siter]]->dim;
+                                                     [jtemp->
+                                                      dim[siter]]].position +
+                            stack[jtemp->dim[siter]][sposition
+                                                     [jtemp->dim[siter]]].size +
+                            intersection[jtemp->dim[siter]]->dim;
 
 //update the position
                         sposition[jtemp->dim[siter]]--;
